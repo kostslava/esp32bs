@@ -1,0 +1,22 @@
+//tryna use the included rgb, this code works, makes it green. 
+
+#include <Adafruit_NeoPixel.h>
+
+#define rgb 48
+#define led 1
+
+Adafruit_NeoPixel pixels(led, rgb, NEO_GRB + NEO_KHZ800);
+
+
+
+void setup() {
+  pixels.begin();
+  pixels.setPixelColor(0, 0, 150, 0);
+  pixels.show();
+}
+
+void loop() {
+
+}
+
+
