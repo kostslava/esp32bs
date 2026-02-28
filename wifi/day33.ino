@@ -2,8 +2,8 @@
 #include <WebServer.h>
 
 //create the constants
-const char* ssid = "RISC-V";
-const char* password = "l1Nux0wnzyoU";
+const char* ssid = "wifi name";
+const char* password = "wifi password";
 
 //start webserver listening on port 80
 WebServer server(80);
