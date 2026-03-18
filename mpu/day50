@@ -1,0 +1,130 @@
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Fonts/TomThumb.h>
+#include <SPI.h>
+#include <Wire.h>
+
+#define MPU 0x68
+
+Adafruit_SSD1306 display(128, 64, &Wire, -1);  // <-- -1 = no reset pin
+
+float accX, accY, accZ;
+float gyroX, gyroY, gyroZ;
+float gyroXoffset, gyroYoffset, gyroZoffset;
+float accXoffset, accYoffset, accZoffset;
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin(17, 18);
+  Wire.beginTransmission(MPU);
+  Wire.write(0x6B);
+  Wire.write(0x00);
+  Wire.endTransmission(true);
+
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // <-- was display.begin(0x3c)
+
+  long gXsum = 0, gYsum = 0, gZsum = 0;
+  long aXsum = 0, aYsum = 0, aZsum = 0;
+
+  Serial.println("Calibrating... keep sensor still!");
+  display.setFont(&TomThumb);
+  display.setCursor(15, 7);
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+
+  display.clearDisplay();
+  display.print("starting calibration in 3..");
+  display.display();
+  delay(1000);
+
+  display.clearDisplay();
+  display.setCursor(15, 7);
+  display.print("starting calibration in 2..");
+  display.display();
+  delay(1000);
+
+  display.clearDisplay();
+  display.setCursor(15, 7);
+  display.print("starting calibration in 1..");
+  display.display();
+  delay(1000);
+
+  for (int i = 0; i < 250; i++) {
+    Wire.beginTransmission(MPU);
+    Wire.write(0x3B);
+    Wire.endTransmission(false);
+    Wire.requestFrom(MPU, 14, true);
+
+    aXsum += (int16_t)(Wire.read() << 8 | Wire.read());
+    aYsum += (int16_t)(Wire.read() << 8 | Wire.read());
+    aZsum += (int16_t)(Wire.read() << 8 | Wire.read());
+    Wire.read(); Wire.read();                 // skip temp
+    gXsum += (int16_t)(Wire.read() << 8 | Wire.read());
+    gYsum += (int16_t)(Wire.read() << 8 | Wire.read());
+    gZsum += (int16_t)(Wire.read() << 8 | Wire.read());
+
+    display.clearDisplay();
+    display.setCursor(20, 7);
+    display.print("CALIBRATING, DO NOT MOVE!");
+    display.setCursor(3, 21);
+    display.print("aX:"); display.print(aXsum / (i + 1) / 16384.0);
+    display.print(" aY:"); display.print(aYsum / (i + 1) / 16384.0);
+    display.print(" aZ:"); display.println(aZsum / (i + 1) / 16384.0);
+
+    display.setCursor(3, 28);
+    display.print("gX:"); display.print(gXsum / (i + 1) / 131.0);
+    display.print(" gY:"); display.print(gYsum / (i + 1) / 131.0);
+    display.print(" gZ:"); display.println(gZsum / (i + 1) / 131.0);
+
+    display.setCursor(3, 35);
+    display.print(i + 1);
+    display.print("/250");
+    display.display();
+
+    delay(2);
+  }
+
+  accXoffset = aXsum / 250.0 / 16384.0;
+  accYoffset = aYsum / 250.0 / 16384.0;
+  accZoffset = aZsum / 250.0 / 16384.0;
+
+  gyroXoffset = gXsum / 250.0 / 131.0;
+  gyroYoffset = gYsum / 250.0 / 131.0;
+  gyroZoffset = gZsum / 250.0 / 131.0;
+  Serial.println("Calibration done!");
+}
+
+void loop() {
+  Wire.beginTransmission(MPU);
+  Wire.write(0x3B);
+  Wire.endTransmission(false);
+  Wire.requestFrom(MPU, 14, true);
+
+  accX = (int16_t)(Wire.read() << 8 | Wire.read()) / 16384.0 - accXoffset;
+  accY = (int16_t)(Wire.read() << 8 | Wire.read()) / 16384.0 - accYoffset;
+  accZ = (int16_t)(Wire.read() << 8 | Wire.read()) / 16384.0 - accZoffset;
+  Wire.read(); Wire.read(); // skip temperature
+  gyroX = (int16_t)(Wire.read() << 8 | Wire.read()) / 131.0 - gyroXoffset;
+  gyroY = (int16_t)(Wire.read() << 8 | Wire.read()) / 131.0 - gyroYoffset;
+  gyroZ = (int16_t)(Wire.read() << 8 | Wire.read()) / 131.0 - gyroZoffset;
+
+  // serial monitor update
+  Serial.print("aX:"); Serial.print(accX);
+  Serial.print(" aY:"); Serial.print(accY);
+  Serial.print(" aZ:"); Serial.println(accZ);
+  Serial.print("gX:"); Serial.print(gyroX);
+  Serial.print(" gY:"); Serial.print(gyroY);
+  Serial.print(" gZ:"); Serial.println(gyroZ);
+  Serial.println("");
+
+  display.clearDisplay();
+  display.setFont(&TomThumb);
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+  display.drawCircle(64 + (accY * 64), 32 + (accX * 32), 5 + (accZ * 5) , SSD1306_WHITE);
+
+  display.drawRect(0, 0, 128, 64, SSD1306_WHITE);
+  display.display();
+
+  delay(10);
+}
